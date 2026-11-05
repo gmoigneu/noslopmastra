@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router';
-import { cartTotal } from '../../lib/cart';
+import { cartSummary } from '../../lib/cart';
 import { money } from '../../lib/catalog';
 import { useCatalog } from './CatalogContext';
 import { useCart } from './useCart';
 import { CartItems } from './CartItems';
+import { FreeShippingProgress } from './FreeShippingProgress';
 import { Arrow } from './Icons';
 
 export function StorageNotice() {
@@ -41,6 +42,7 @@ export default function Cart() {
         <StorageNotice />
       </main>
     );
+  const summary = cartSummary(state.lines, products);
   return (
     <main className="wrap flow-page" id="main">
       <Link className="text-button back-link" to="/">
@@ -55,14 +57,21 @@ export default function Cart() {
         <CartItems lines={state.lines} products={products} />
         <aside className="order-summary">
           <h2>The short version.</h2>
+          <FreeShippingProgress lines={state.lines} products={products} />
           <div className="total-row">
             <span>Subtotal</span>
-            <span>{money(cartTotal(state.lines, products))}</span>
+            <span>{money(summary.subtotalCents)}</span>
           </div>
-          <p className="meta">USD. No shipping or tax charges.</p>
+          <div className="total-row">
+            <span>Shipping</span>
+            <span>
+              {summary.shippingCents ? money(summary.shippingCents) : 'Free'}
+            </span>
+          </div>
+          <p className="meta">USD. No tax charges.</p>
           <div className="total-row order-summary__total">
             <strong>Total</strong>
-            <strong>{money(cartTotal(state.lines, products))}</strong>
+            <strong>{money(summary.totalCents)}</strong>
           </div>
           <Link className="button button--dark button--wide" to="/checkout">
             Simulated checkout <Arrow />

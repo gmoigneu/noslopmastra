@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CART_KEY,
   ORDER_KEY,
+  cartSummary,
   cartTotal,
   createCart,
   lineKey,
   restoreLines,
+  shippingFor,
   type StoragePort,
 } from './cart';
 import { money, type Product } from './catalog';
@@ -200,7 +202,7 @@ describe('browser persistence', () => {
     const { cart } = setup(unavailable, unavailable);
     expect(cart.store.get().storageBlocked).toBe(true);
     expect(cart.add('tee', 'black', 'M')).toBe(true);
-    expect(cart.placeOrder(() => 'DEMO-BLOCKED')?.totalCents).toBe(3200);
+    expect(cart.placeOrder(() => 'DEMO-BLOCKED')?.totalCents).toBe(4100);
     expect(cart.store.get().lines).toEqual([]);
   });
 
@@ -261,6 +263,8 @@ describe('simulated checkout', () => {
       'createdAt',
       'lines',
       'reference',
+      'shippingCents',
+      'subtotalCents',
       'totalCents',
     ]);
     expect(session.getItem(ORDER_KEY)).not.toMatch(
@@ -285,5 +289,156 @@ describe('simulated checkout', () => {
       const session = memoryStorage({ [ORDER_KEY]: JSON.stringify(tampered) });
       expect(setup(memoryStorage(), session).cart.store.get().order).toBeNull();
     }
+  });
+});
+
+describe('free shipping', () => {
+  const summaryFor = (quantity: number, stickers = 0) =>
+    cartSummary(
+      [
+        ...(quantity ? [{ ...line, quantity }] : []),
+        ...(stickers
+          ? [
+              {
+                productId: 'sticker',
+                color: 'off-white' as const,
+                size: 'One format',
+                quantity: stickers,
+              },
+            ]
+          : []),
+      ],
+      products,
+    );
+
+  it('charges no shipping on an empty cart', () => {
+    expect(summaryFor(0)).toMatchObject({
+      subtotalCents: 0,
+      shippingCents: 0,
+      totalCents: 0,
+      progress: 0,
+      unlocked: false,
+    });
+    expect(shippingFor(0)).toBe(0);
+  });
+
+  it('charges $9 below $40, based on the subtotal rather than the total', () => {
+    expect(summaryFor(1)).toMatchObject({
+      subtotalCents: 3200,
+      shippingCents: 900,
+      totalCents: 4100,
+      remainingCents: 800,
+      progress: 0.8,
+      unlocked: false,
+    });
+    expect(shippingFor(3999)).toBe(900);
+    expect(summaryFor(0, 9)).toMatchObject({ subtotalCents: 3600 });
+  });
+
+  it('is free at exactly $40 and above, capping progress at 100%', () => {
+    expect(summaryFor(1, 2)).toMatchObject({
+      subtotalCents: 4000,
+      shippingCents: 0,
+      totalCents: 4000,
+      remainingCents: 0,
+      progress: 1,
+      unlocked: true,
+    });
+    expect(shippingFor(4001)).toBe(0);
+    expect(summaryFor(2, 8)).toMatchObject({
+      subtotalCents: 9600,
+      shippingCents: 0,
+      remainingCents: 0,
+      progress: 1,
+      unlocked: true,
+    });
+  });
+
+  it('updates when additions, quantity changes and removals cross the threshold', () => {
+    const { cart } = setup();
+    const summary = () => cartSummary(cart.store.get().lines, products);
+    cart.add('tee', 'black', 'M');
+    expect(summary().shippingCents).toBe(900);
+    cart.add('sticker', 'off-white', 'One format', 2);
+    expect(summary()).toMatchObject({ subtotalCents: 4000, shippingCents: 0 });
+    cart.quantity(
+      lineKey({
+        ...line,
+        productId: 'sticker',
+        color: 'off-white',
+        size: 'One format',
+      }),
+      1,
+    );
+    expect(summary()).toMatchObject({
+      subtotalCents: 3600,
+      shippingCents: 900,
+    });
+    cart.quantity(lineKey(line), 2);
+    expect(summary()).toMatchObject({ subtotalCents: 6800, shippingCents: 0 });
+    cart.remove(lineKey(line));
+    expect(summary()).toMatchObject({ subtotalCents: 400, shippingCents: 900 });
+  });
+
+  it('snapshots subtotal, shipping and total in new receipts', () => {
+    for (const [quantity, stickers, shipping] of [
+      [1, 0, 900],
+      [1, 2, 0],
+      [2, 0, 0],
+    ] as const) {
+      const { cart } = setup();
+      cart.add('tee', 'black', 'M', quantity);
+      if (stickers) cart.add('sticker', 'off-white', 'One format', stickers);
+      const order = cart.placeOrder(() => 'DEMO-SHIP')!;
+      const subtotal = quantity * 3200 + stickers * 400;
+      expect(order).toMatchObject({
+        subtotalCents: subtotal,
+        shippingCents: shipping,
+        totalCents: subtotal + shipping,
+      });
+    }
+  });
+
+  describe('receipt restoration', () => {
+    const receipt = (quantity: number) => {
+      const { cart } = setup();
+      cart.add('tee', 'black', 'M', quantity);
+      return cart.placeOrder(() => 'DEMO-RESTORE')!;
+    };
+    const restore = (value: unknown) =>
+      setup(
+        memoryStorage(),
+        memoryStorage({ [ORDER_KEY]: JSON.stringify(value) }),
+      ).cart.store.get().order;
+
+    it('keeps legacy receipts unchanged', () => {
+      const { subtotalCents, shippingCents, ...legacy } = receipt(1);
+      void subtotalCents;
+      void shippingCents;
+      const legacyOrder = { ...legacy, totalCents: 3200 };
+      expect(restore(legacyOrder)).toEqual(legacyOrder);
+    });
+
+    it('restores valid new receipts below and above the threshold', () => {
+      for (const quantity of [1, 2]) {
+        const order = receipt(quantity);
+        expect(restore(order)).toEqual(order);
+      }
+    });
+
+    it('rejects tampered new receipts', () => {
+      const order = receipt(1);
+      for (const tampered of [
+        { ...order, shippingCents: 0 },
+        { ...order, totalCents: 3200 },
+        { ...order, subtotalCents: 3100 },
+        { ...order, shippingCents: 900.5 },
+        { ...order, shippingCents: '900' },
+        { ...order, subtotalCents: undefined },
+        { ...order, shippingCents: undefined },
+      ]) {
+        expect(restore(tampered)).toBeNull();
+      }
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { cart, cartTotal, lineKey } from '../../lib/cart';
+import { cart, cartSummary, lineKey } from '../../lib/cart';
 import { colorLabel, money, productImage } from '../../lib/catalog';
 import { useCatalog } from './CatalogContext';
 import { useCart } from './useCart';
@@ -30,6 +30,7 @@ export default function Checkout() {
         description="Add an object to your cart before placing a demo order."
       />
     );
+  const summary = cartSummary(state.lines, products);
   return (
     <main className="wrap flow-page" id="main">
       <Link className="text-button back-link" to="/cart">
@@ -93,11 +94,21 @@ export default function Checkout() {
               );
             })}
           </ul>
+          <div className="total-row">
+            <span>Subtotal</span>
+            <span>{money(summary.subtotalCents)}</span>
+          </div>
+          <div className="total-row">
+            <span>Shipping</span>
+            <span>
+              {summary.shippingCents ? money(summary.shippingCents) : 'Free'}
+            </span>
+          </div>
           <div className="total-row order-summary__total">
             <strong>Total</strong>
-            <strong>{money(cartTotal(state.lines, products))}</strong>
+            <strong>{money(summary.totalCents)}</strong>
           </div>
-          <p className="meta">USD. No shipping or tax charges.</p>
+          <p className="meta">USD. No tax charges.</p>
           <button
             className="button button--dark button--wide"
             type="button"

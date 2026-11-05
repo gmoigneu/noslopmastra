@@ -4,6 +4,8 @@ import { validVariant, type Color, type Product } from './catalog';
 export const CART_KEY = 'noslopfactory.cart.v1';
 export const ORDER_KEY = 'noslopfactory.order.v1';
 export const MAX_QUANTITY = 99;
+export const FREE_SHIPPING_THRESHOLD_CENTS = 4000;
+export const SHIPPING_FEE_CENTS = 900;
 export interface CartLine {
   productId: string;
   color: Color;
@@ -20,6 +22,10 @@ export interface DemoOrder {
   createdAt: string;
   lines: OrderLine[];
   totalCents: number;
+  // Present on receipts created with shipping. Legacy receipts omit both and
+  // their totalCents is the plain line sum.
+  subtotalCents?: number;
+  shippingCents?: number;
 }
 export interface CartState {
   lines: CartLine[];
@@ -151,12 +157,34 @@ function restoreOrder(raw: string | null): DemoOrder | null {
       (sum, line) => sum + line.priceCents * line.quantity,
       0,
     );
-    if (value.totalCents !== totalCents) return null;
+    const hasSubtotal = value.subtotalCents !== undefined;
+    const hasShipping = value.shippingCents !== undefined;
+    if (!hasSubtotal && !hasShipping) {
+      if (value.totalCents !== totalCents) return null;
+      return {
+        reference: value.reference,
+        createdAt: value.createdAt,
+        lines,
+        totalCents,
+      };
+    }
+    if (!hasSubtotal || !hasShipping) return null;
+    if (
+      !Number.isInteger(value.subtotalCents) ||
+      !Number.isInteger(value.shippingCents) ||
+      !Number.isInteger(value.totalCents) ||
+      value.subtotalCents !== totalCents ||
+      value.shippingCents !== shippingFor(totalCents) ||
+      value.totalCents !== totalCents + shippingFor(totalCents)
+    )
+      return null;
     return {
       reference: value.reference,
       createdAt: value.createdAt,
       lines,
-      totalCents,
+      subtotalCents: totalCents,
+      shippingCents: shippingFor(totalCents),
+      totalCents: totalCents + shippingFor(totalCents),
     };
   } catch {
     return null;
@@ -171,6 +199,25 @@ export function cartTotal(lines: CartLine[], products: Product[]) {
     (sum, line) => sum + (prices.get(line.productId) ?? 0) * line.quantity,
     0,
   );
+}
+
+export function shippingFor(subtotalCents: number) {
+  return subtotalCents <= 0 || subtotalCents >= FREE_SHIPPING_THRESHOLD_CENTS
+    ? 0
+    : SHIPPING_FEE_CENTS;
+}
+
+export function cartSummary(lines: CartLine[], products: Product[]) {
+  const subtotalCents = cartTotal(lines, products);
+  const shippingCents = shippingFor(subtotalCents);
+  return {
+    subtotalCents,
+    shippingCents,
+    totalCents: subtotalCents + shippingCents,
+    remainingCents: Math.max(0, FREE_SHIPPING_THRESHOLD_CENTS - subtotalCents),
+    progress: Math.min(1, subtotalCents / FREE_SHIPPING_THRESHOLD_CENTS),
+    unlocked: subtotalCents >= FREE_SHIPPING_THRESHOLD_CENTS,
+  };
 }
 
 export function createCart(initialProducts: Product[] = []) {
@@ -302,14 +349,18 @@ export function createCart(initialProducts: Product[] = []) {
           image: image.src,
         });
       }
+      const subtotalCents = lines.reduce(
+        (sum, line) => sum + line.priceCents * line.quantity,
+        0,
+      );
+      const shippingCents = shippingFor(subtotalCents);
       const order: DemoOrder = {
         reference: makeReference(),
         createdAt: new Date().toISOString(),
         lines,
-        totalCents: lines.reduce(
-          (sum, line) => sum + line.priceCents * line.quantity,
-          0,
-        ),
+        subtotalCents,
+        shippingCents,
+        totalCents: subtotalCents + shippingCents,
       };
       store.setState((state) => ({ ...state, order, lines: [] }));
       write(session, ORDER_KEY, order);

@@ -63,6 +63,20 @@ export default function Confirmation() {
             </li>
           ))}
         </ul>
+        {order.shippingCents !== undefined ? (
+          <>
+            <div className="total-row">
+              <span>Subtotal</span>
+              <span>{money(order.subtotalCents ?? 0)}</span>
+            </div>
+            <div className="total-row">
+              <span>Shipping</span>
+              <span>
+                {order.shippingCents ? money(order.shippingCents) : 'Free'}
+              </span>
+            </div>
+          </>
+        ) : null}
         <div className="total-row order-summary__total">
           <span>
             Demo total <span className="meta">USD</span>

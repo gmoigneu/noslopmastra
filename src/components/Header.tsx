@@ -3,6 +3,7 @@ import type { Product } from '../lib/catalog';
 import { cartTotal } from '../lib/cart';
 import { money } from '../lib/catalog';
 import { CartItems } from './shop/CartItems';
+import { FreeShippingProgress } from './shop/FreeShippingProgress';
 import { Arrow, Bag } from './shop/Icons';
 import { useCart, useCartConnection } from './shop/useCart';
 import { ShopLink } from './shop/ShopLink';
@@ -79,6 +80,7 @@ export default function Header({
               onNavigate={() => dialog.current?.close()}
             />
             <div className="mini-cart__bottom">
+              <FreeShippingProgress lines={state.lines} products={products} />
               <div className="total-row">
                 <span>Subtotal</span>
                 <strong>{money(cartTotal(state.lines, products))}</strong>

@@ -6,7 +6,7 @@ Governing issue: https://github.com/upsun/noslopfactory.com/issues/1
 
 ## Outcome
 
-Build a convincing, explicitly simulated merchandise shop at `/shop`. Keep `/` as a placeholder for the future educational website. No real transactions, payment fields, personal information, accounts, shipping, taxes, or server-side order storage.
+Build a convincing, explicitly simulated merchandise shop at `/shop`. Keep `/` as a placeholder for the future educational website. No real transactions, payment fields, personal information, accounts, taxes, or server-side order storage. Shipping is simulated only (see Shipping).
 
 ## Design and content
 
@@ -35,6 +35,10 @@ Astro owns public documents and build-time content validation. A React applicati
 The cart persists in versioned browser localStorage. A line is identified by product, color and size. Store only product identifiers, selections and quantity; derive current prices from content. Reject malformed storage and unavailable products/variants, cap quantities at 99, and keep the shop usable when storage is blocked. Reconcile storage events between tabs. No network API is needed.
 
 Simulated checkout presents an order summary and one explicit demo-order action. Confirmation records an immutable snapshot and a locally generated demo reference; it clears the cart once. Keep only the most recent demo confirmation in the current tab's sessionStorage, so confirmation refresh works without storing personal information or creating a real order. An absent confirmation or empty checkout offers a route back to shopping.
+
+## Shipping
+
+Shipping is simulated and nothing is shipped. A flat $9 fee applies to a non-empty cart whose product subtotal (excluding shipping) is below $40; at $40 or more shipping is free. A $32 subtotal therefore shows "Add $8 to get free shipping" and totals $41, which does not qualify. The mini cart and cart page show an accessible progress bar (hidden for an empty cart, capped at 100%) with "Add $x to get free shipping" or "Free shipping unlocked", recalculated on every add, quantity change and removal. Cart, checkout and new receipts share one calculation. New receipts snapshot subtotal, shipping and total; earlier receipts without shipping fields remain valid and display as before.
 
 ## Implementation and verification
 
