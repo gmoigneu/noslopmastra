@@ -46,7 +46,7 @@ Cart selections are stored at `noslopfactory.cart.v1` in localStorage. Each prod
 
 Checkout creates a local demo receipt and clears the cart. Only the most recent receipt is retained in the current tab's sessionStorage, at `noslopfactory.order.v1`. A confirmation refresh shows the same receipt without submitting another order. The application remains usable in memory if browser storage is blocked, but persistence cannot be guaranteed.
 
-There is no backend, account system, analytics integration, payment provider, shipping calculation, or tax calculation.
+There is no backend, account system, analytics integration, payment provider, or tax calculation. Shipping is simulated: a flat $9 fee applies to product subtotals below $40, and shipping is free from $40 up (threshold on the subtotal, excluding shipping). The mini cart and cart page show progress toward free shipping, and new receipts record subtotal, shipping and total. Receipts without shipping fields from earlier versions still restore unchanged.
 
 ## Design and scope
 

@@ -849,6 +849,14 @@ em {
 .total-row strong {
   font-weight: 500;
 }
+.order-summary .total-row + .total-row:not(.order-summary__total),
+.confirmation-receipt .total-row + .total-row:not(.order-summary__total) {
+  margin-top: 12px;
+}
+.order-summary .summary-items + .total-row:not(.order-summary__total),
+.confirmation-receipt .summary-items + .total-row:not(.order-summary__total) {
+  margin-top: 20px;
+}
 .order-summary > .meta {
   margin-top: 12px;
   font-size: 10px;
@@ -1063,6 +1071,35 @@ em {
 .mini-cart__bottom > .meta {
   margin-block: 8px 20px;
   font-size: 10px;
+}
+.shipping-progress {
+  margin-bottom: 20px;
+}
+.order-summary .shipping-progress {
+  margin-bottom: 24px;
+}
+.shipping-progress__text {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--n6-ink);
+}
+.shipping-progress__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--n6-line-light);
+}
+.shipping-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--n6-spectral-cyan),
+    var(--n6-spectral-blue),
+    var(--n6-spectral-violet)
+  );
+  transition: width 0.3s ease;
 }
 .continue-link {
   display: flex;
