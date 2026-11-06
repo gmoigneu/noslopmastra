@@ -6,7 +6,7 @@ Governing issue: https://github.com/upsun/noslopfactory.com/issues/1
 
 ## Outcome
 
-Build a convincing, explicitly simulated merchandise shop at `/shop`. Keep `/` as a placeholder for the future educational website. No real transactions, payment fields, personal information, accounts, shipping, taxes, or server-side order storage.
+Build a convincing, explicitly simulated merchandise shop at `/shop`. Keep `/` as a placeholder for the future educational website. No real transactions, payment fields, personal information, accounts, taxes, or server-side order storage. Simulated shipping is a flat $9 below a $40 product subtotal and free at $40 or more.
 
 ## Design and content
 

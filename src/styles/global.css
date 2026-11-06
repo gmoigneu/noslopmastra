@@ -1530,3 +1530,33 @@ em {
   font-size: 12px;
   line-height: 1.5;
 }
+
+.shipping-progress {
+  margin-bottom: 20px;
+}
+.shipping-progress__message {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.shipping-progress__bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--n6-line-light);
+}
+.shipping-progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--n6-ink);
+  transition: width 0.25s ease;
+}
+.order-summary > .shipping-progress {
+  margin-top: -8px;
+}
+.mini-cart__bottom .total-row + .total-row,
+.order-summary .total-row + .total-row:not(.order-summary__total),
+.confirmation-receipt .receipt-row {
+  margin-top: 8px;
+}
