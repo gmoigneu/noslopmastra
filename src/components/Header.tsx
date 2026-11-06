@@ -1,8 +1,9 @@
 import { useRef } from 'react';
 import type { Product } from '../lib/catalog';
-import { cartTotal } from '../lib/cart';
+import { cartPricing } from '../lib/cart';
 import { money } from '../lib/catalog';
 import { CartItems } from './shop/CartItems';
+import { FreeShippingProgress } from './shop/FreeShippingProgress';
 import { Arrow, Bag } from './shop/Icons';
 import { useCart, useCartConnection } from './shop/useCart';
 import { ShopLink } from './shop/ShopLink';
@@ -18,6 +19,7 @@ export default function Header({
   const state = useCart();
   const dialog = useRef<HTMLDialogElement>(null);
   const count = state.lines.reduce((sum, line) => sum + line.quantity, 0);
+  const pricing = cartPricing(state.lines, products);
   return (
     <>
       <header className="site-header">
@@ -79,9 +81,22 @@ export default function Header({
               onNavigate={() => dialog.current?.close()}
             />
             <div className="mini-cart__bottom">
+              <FreeShippingProgress lines={state.lines} products={products} />
               <div className="total-row">
                 <span>Subtotal</span>
-                <strong>{money(cartTotal(state.lines, products))}</strong>
+                <strong>{money(pricing.subtotalCents)}</strong>
+              </div>
+              <div className="total-row">
+                <span>Shipping</span>
+                <strong>
+                  {pricing.shippingCents
+                    ? money(pricing.shippingCents)
+                    : 'Free'}
+                </strong>
+              </div>
+              <div className="total-row">
+                <span>Total</span>
+                <strong>{money(pricing.totalCents)}</strong>
               </div>
               <p className="meta">Demo products. No real charges.</p>
               <ShopLink

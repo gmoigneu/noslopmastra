@@ -3,6 +3,7 @@ import {
   CART_KEY,
   ORDER_KEY,
   cartTotal,
+  cartPricing,
   createCart,
   lineKey,
   restoreLines,
@@ -200,7 +201,7 @@ describe('browser persistence', () => {
     const { cart } = setup(unavailable, unavailable);
     expect(cart.store.get().storageBlocked).toBe(true);
     expect(cart.add('tee', 'black', 'M')).toBe(true);
-    expect(cart.placeOrder(() => 'DEMO-BLOCKED')?.totalCents).toBe(3200);
+    expect(cart.placeOrder(() => 'DEMO-BLOCKED')?.totalCents).toBe(4100);
     expect(cart.store.get().lines).toEqual([]);
   });
 
@@ -261,6 +262,8 @@ describe('simulated checkout', () => {
       'createdAt',
       'lines',
       'reference',
+      'shippingCents',
+      'subtotalCents',
       'totalCents',
     ]);
     expect(session.getItem(ORDER_KEY)).not.toMatch(
@@ -281,6 +284,126 @@ describe('simulated checkout', () => {
         lines: [{ ...order.lines[0], image: 'https://tracker.example/pixel' }],
       },
       { ...order, lines: [{ ...order.lines[0], quantity: -1 }] },
+    ]) {
+      const session = memoryStorage({ [ORDER_KEY]: JSON.stringify(tampered) });
+      expect(setup(memoryStorage(), session).cart.store.get().order).toBeNull();
+    }
+  });
+});
+
+describe('free shipping', () => {
+  const priced = (priceCents: number) => [{ ...shirt, priceCents }];
+  it('prices empty carts with no shipping and no progress', () => {
+    expect(cartPricing([], products)).toEqual({
+      subtotalCents: 0,
+      shippingCents: 0,
+      totalCents: 0,
+      remainingCents: 4000,
+      progress: 0,
+      qualifies: false,
+    });
+  });
+  it('charges $9 below $40, judged by the subtotal and not the total', () => {
+    const below = cartPricing([line], products);
+    expect(below).toMatchObject({
+      subtotalCents: 3200,
+      shippingCents: 900,
+      totalCents: 4100,
+      remainingCents: 800,
+      progress: 0.8,
+      qualifies: false,
+    });
+    const justBelow = cartPricing([line], priced(3999));
+    expect(justBelow).toMatchObject({
+      shippingCents: 900,
+      remainingCents: 1,
+      qualifies: false,
+    });
+    expect(justBelow.progress).toBeLessThan(1);
+  });
+  it('is free at exactly $40 and above, with progress capped at 100%', () => {
+    expect(cartPricing([line], priced(4000))).toMatchObject({
+      shippingCents: 0,
+      totalCents: 4000,
+      remainingCents: 0,
+      progress: 1,
+      qualifies: true,
+    });
+    expect(cartPricing([{ ...line, quantity: 3 }], products)).toMatchObject({
+      subtotalCents: 9600,
+      shippingCents: 0,
+      totalCents: 9600,
+      progress: 1,
+      qualifies: true,
+    });
+  });
+  it('recalculates when changes cross the threshold in either direction', () => {
+    const { cart } = setup();
+    const pricing = () => cartPricing(cart.store.get().lines, products);
+    const stickerLine = {
+      productId: 'sticker',
+      color: 'off-white' as const,
+      size: 'One format',
+    };
+    cart.add('tee', 'black', 'M');
+    expect(pricing().qualifies).toBe(false);
+    cart.add('tee', 'black', 'M');
+    expect(pricing()).toMatchObject({ shippingCents: 0, qualifies: true });
+    cart.quantity(lineKey(line), 1);
+    expect(pricing()).toMatchObject({ shippingCents: 900, qualifies: false });
+    cart.add('sticker', 'off-white', 'One format', 2);
+    expect(pricing()).toMatchObject({ subtotalCents: 4000, shippingCents: 0 });
+    cart.quantity(lineKey(stickerLine), 1);
+    expect(pricing()).toMatchObject({
+      subtotalCents: 3600,
+      shippingCents: 900,
+    });
+    cart.remove(lineKey(line));
+    cart.remove(lineKey(stickerLine));
+    expect(pricing().shippingCents).toBe(0);
+  });
+  it('snapshots shipping on new receipts on both sides of the threshold', () => {
+    const below = setup().cart;
+    below.add('tee', 'black', 'M');
+    expect(below.placeOrder(() => 'DEMO-BELOW')).toMatchObject({
+      subtotalCents: 3200,
+      shippingCents: 900,
+      totalCents: 4100,
+    });
+    const above = setup().cart;
+    above.add('tee', 'black', 'M', 2);
+    expect(above.placeOrder(() => 'DEMO-ABOVE')).toMatchObject({
+      subtotalCents: 6400,
+      shippingCents: 0,
+      totalCents: 6400,
+    });
+  });
+  it('keeps receipts saved without shipping fields unchanged', () => {
+    const { cart } = setup();
+    cart.add('tee', 'black', 'M');
+    const { subtotalCents, shippingCents, ...legacy } = cart.placeOrder(
+      () => 'DEMO-LEGACY',
+    )!;
+    void subtotalCents;
+    void shippingCents;
+    const restored = { ...legacy, totalCents: 3200 };
+    const session = memoryStorage({ [ORDER_KEY]: JSON.stringify(restored) });
+    expect(setup(memoryStorage(), session).cart.store.get().order).toEqual(
+      restored,
+    );
+  });
+  it('rejects receipts with inconsistent shipping, subtotal or total', () => {
+    const { cart } = setup();
+    cart.add('tee', 'black', 'M');
+    const order = cart.placeOrder(() => 'DEMO-TAMPER')!;
+    const { shippingCents, subtotalCents, ...rest } = order;
+    for (const tampered of [
+      { ...order, shippingCents: 0 },
+      { ...order, shippingCents: 900, totalCents: 3200 },
+      { ...order, subtotalCents: 1 },
+      { ...order, totalCents: 3200 },
+      { ...rest, shippingCents },
+      { ...rest, subtotalCents },
     ]) {
       const session = memoryStorage({ [ORDER_KEY]: JSON.stringify(tampered) });
       expect(setup(memoryStorage(), session).cart.store.get().order).toBeNull();
